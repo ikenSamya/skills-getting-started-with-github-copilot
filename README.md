@@ -12,5 +12,26 @@ Remember, it's self-paced so feel free to take a break! ☕️
 
 ---
 
-&copy; 2025 GitHub &bull; [Code of Conduct](https://www.contributor-covenant.org/version/2/1/code_of_conduct/code_of_conduct.md) &bull; [MIT License](https://gh.io/mit)
+## Running the API and tests
 
+Install the project dependencies, including `pytest`:
+
+```powershell
+py -m pip install -r requirements.txt
+```
+
+Start the API from the repository root:
+
+```powershell
+py -m uvicorn app:app --reload --app-dir src
+```
+
+Run the backend tests with:
+
+```powershell
+py -m pytest
+```
+
+---
+
+&copy; 2025 GitHub &bull; [Code of Conduct](https://www.contributor-covenant.org/version/2/1/code_of_conduct/code_of_conduct.md) &bull; [MIT License](https://gh.io/mit)
