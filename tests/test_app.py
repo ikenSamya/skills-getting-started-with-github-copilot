@@ -1,4 +1,5 @@
 from copy import deepcopy
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from fastapi.testclient import TestClient
@@ -46,7 +47,8 @@ def test_get_activities_returns_activity_data(client):
 def test_signup_adds_participant(client):
     # Arrange
     activity = "Chess Club"
-    email = "new-student@mergington.edu"
+    email = "  New-Student@Mergington.edu  "
+    normalized_email = "new-student@mergington.edu"
 
     # Act
     response = client.post(
@@ -56,14 +58,14 @@ def test_signup_adds_participant(client):
 
     # Assert
     assert response.status_code == 200
-    assert response.json() == {"message": f"Signed up {email} for {activity}"}
-    assert email in activities[activity]["participants"]
+    assert response.json() == {"message": f"Signed up {normalized_email} for {activity}"}
+    assert normalized_email in activities[activity]["participants"]
 
 
 def test_signup_rejects_duplicate_participant(client):
     # Arrange
     activity = "Chess Club"
-    email = "michael@mergington.edu"
+    email = "  MICHAEL@MergingTon.edu "
 
     # Act
     response = client.post(
@@ -74,6 +76,22 @@ def test_signup_rejects_duplicate_participant(client):
     # Assert
     assert response.status_code == 400
     assert response.json()["detail"] == "Student is already signed up for this activity"
+
+
+def test_signup_rejects_blank_email(client):
+    # Arrange
+    activity = "Chess Club"
+    email = "   "
+
+    # Act
+    response = client.post(
+        f"/activities/{activity}/signup",
+        params={"email": email},
+    )
+
+    # Assert
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Email must not be blank"
 
 
 def test_signup_rejects_participant_when_activity_is_full(client):
@@ -94,6 +112,30 @@ def test_signup_rejects_participant_when_activity_is_full(client):
     assert email not in activities[activity]["participants"]
 
 
+def test_concurrent_signups_do_not_exceed_activity_capacity(client):
+    # Arrange
+    activity = "Basketball Club"
+    capacity = 3
+    email_count = 12
+    activities[activity]["participants"] = []
+    activities[activity]["max_participants"] = capacity
+
+    # Act
+    def signup(index):
+        return client.post(
+            f"/activities/{activity}/signup",
+            params={"email": f"student-{index}@mergington.edu"},
+        )
+
+    with ThreadPoolExecutor(max_workers=email_count) as executor:
+        responses = list(executor.map(signup, range(email_count)))
+
+    # Assert
+    assert sum(response.status_code == 200 for response in responses) == capacity
+    assert sum(response.status_code == 400 for response in responses) == email_count - capacity
+    assert len(activities[activity]["participants"]) == capacity
+
+
 def test_signup_returns_not_found_for_unknown_activity(client):
     # Arrange
     activity = "Unknown Club"
@@ -112,7 +154,8 @@ def test_signup_returns_not_found_for_unknown_activity(client):
 def test_unregister_removes_participant(client):
     # Arrange
     activity = "Chess Club"
-    email = "michael@mergington.edu"
+    email = " MICHAEL@MergingTon.edu "
+    normalized_email = "michael@mergington.edu"
 
     # Act
     response = client.delete(
@@ -122,8 +165,10 @@ def test_unregister_removes_participant(client):
 
     # Assert
     assert response.status_code == 200
-    assert response.json() == {"message": f"Unregistered {email} from {activity}"}
-    assert email not in activities[activity]["participants"]
+    assert response.json() == {
+        "message": f"Unregistered {normalized_email} from {activity}"
+    }
+    assert normalized_email not in activities[activity]["participants"]
 
 
 def test_unregister_returns_not_found_for_unregistered_participant(client):
